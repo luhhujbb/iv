@@ -1,0 +1,7 @@
+export INVENTORY_HOST_PORT="inventory.example.com:80"
+export INVENTORY_SCHEME="http"
+export IV_USER="inventory"
+export IV_ALT_USER="ec2-user"
+export IV_RESOURCE_TYPE_TAG="Name"
+export IV_RESOURCE_ENV_TAG="ENV"
+export IV_RESOURCE_HOST_TAG="privateIp"

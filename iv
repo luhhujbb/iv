@@ -1,0 +1,123 @@
+#!/bin/bash
+
+source iv.config
+
+if ! which jq;
+  then
+  echo "iv need jq"
+  exit 1
+fi
+
+if ! which curl;
+  then
+  echo "iv need jq"
+  exit 1
+fi
+
+##############################
+# USAGE
+##############################
+
+
+function usage(){
+  echo "iv cli helper !"
+}
+
+##############################
+# GETTER
+##############################
+
+
+function get_resource(){
+  curl "$INVENTORY_SCHEME://$INVENTORY_HOST_PORT/inventory/resource/$1" | jq .data
+}
+
+function get_resource_tag(){
+
+}
+
+function get_resources(){
+
+}
+
+function get_resources_tag(){
+
+}
+
+##############################
+# LIST
+##############################
+
+function list_envs(){
+
+}
+
+function list_tags(){
+
+}
+
+function list_resource_types(){
+
+}
+
+##############################
+# EXEC
+##############################
+
+function iv_exec(){
+
+}
+
+function iv_alt_exec(){
+
+}
+
+
+function generic_get(){
+  case $1 in
+    "resource")
+    get_resource "${@:2}"
+    ;;
+    "resource-tag")
+    get_resource_tag "${@:2}"
+    ;;
+    "resources")
+    get_resources "${@:2}"
+    ;;
+    "resources-tag")
+    get_resources_tag "${@:2}"
+    ;;
+  esac
+}
+
+function generic_list(){
+  case $1 in
+    "tags")
+    list_tags
+    ;;
+    "envs")
+    list_envs
+    ;;
+    "resource-types")
+    list_resource_types
+    ;;
+  esac
+}
+
+case $1 in
+  "get")
+  generic_get "${@:2}"
+  ;;
+  "list")
+  generic_list "${@:2}"
+  ;;
+  "exec")
+  get_resources "${@:2}"
+  ;;
+  "alt-exec")
+  get_resources "${@:2}"
+  ;;
+  *)
+  usage
+  ;;
+esac
