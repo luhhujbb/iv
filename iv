@@ -1,16 +1,18 @@
 #!/bin/bash
 
-source iv.config
+source /etc/iv.config
 
 #################################
 # Deps check
 #################################
+
 jq_path=$(which jq)
 if [ -z "$jq_path" ];
   then
   echo "iv need jq"
   exit 1
 fi
+
 curl_path=$(which curl)
 if [ -z "$jq_path" ];
   then
@@ -34,19 +36,21 @@ fi
 
 INVENTORY_URL="$INVENTORY_SCHEME://$INVENTORY_HOST_PORT"
 
-
 ##############################
 # USAGE
 ##############################
-
 
 function usage(){
   echo "Usage of iv cli :"
   echo "* iv get"
   echo " - iv get resource [RESOURCE_ID]"
   echo " - iv get resources [ENV_TAG] [RESOURCE_TYPE_TAG] (--raw-output)"
-  echo " - iv get resource tag [RESOURCE_ID] [TAG] (--raw-output)"
-  echo " - iv get resources tag [RESOURCE_ID] [TAG] (--raw-output)"
+  echo " - iv get resource-tag [RESOURCE_ID] [TAG] (--raw-output)"
+  echo " - iv get resources-tag [RESOURCE_ID] [TAG] (--raw-output)"
+  echo "* iv set"
+  echo " - iv set resource-tag [RESOURCE_ID] [TAG] [VALUE]"
+  echo "* iv del"
+  echo " - iv del resource-tag [RESOURCE_ID] [TAG] [VALUE]"
   echo "* iv list"
   echo " - iv list envs"
   echo " - iv list tags"
@@ -62,7 +66,6 @@ function usage(){
 # Build filter
 ##############################
 
-
 function build_filter(){
   if [ -z "$1" -a -z "$2" ];
   then
@@ -72,19 +75,45 @@ function build_filter(){
   fi
 }
 
+function build_tag(){
+  if [ -z "$1" -a -z "$2" -a -z "$3" ];
+  then
+    echo -n "{}"
+  else
+    echo -n "{\"tags\":[{\"name\":\"$1\",\"value\":\"$2\",\"delete\":$3}]}"
+  fi
+}
+
 ##############################
 # GETTER
 ##############################
 
-
 function get_resource(){
-  curl -s "$INVENTORY_URL/inventory/resource/$1" \
-  | jq .data "${@:2}"
+  if [ ! -z "$1" ];
+  then
+    curl -s "$INVENTORY_URL/inventory/resource/$1" \
+    | jq .data "${@:2}"
+  else
+    echo "iv get resource [RESOURCE_ID] : missing RESOURCE_ID"
+    exit 1
+  fi
 }
 
 function get_resource_tag(){
-  curl -s "$INVENTORY_URL/inventory/resource/$1" \
-  | jq .data.$2 "${@:3}"
+  if [ ! -z "$1" ];
+  then
+    if [ ! -z "$2" ];
+    then
+      curl -s "$INVENTORY_URL/inventory/resource/$1" \
+      | jq .data.$2 "${@:3}"
+    else
+      echo "iv get resource-tag $1 [TAG]: missing TAG"
+      exit 1
+    fi
+  else
+    echo "iv get resource-tag [RESOURCE_ID] [TAG]: missing RESOURCE_ID and TAG"
+    exit 1
+  fi
 }
 
 function get_resources(){
@@ -102,6 +131,31 @@ function get_resources_tag(){
        -H "Content-Type: application/json" \
   | jq .data[] "${@:4}"
 }
+
+##############################
+# Setter
+##############################
+
+function set_resource_tag(){
+  TAG=$(build_tag $2 $3 "false")
+  curl -s -XPOST "$INVENTORY_URL/inventory/resource/$1/addtags" \
+       -d $TAG \
+       -H "Content-Type: application/json" \
+  | jq .state "${@:4}"
+}
+
+##############################
+# Del
+##############################
+
+function del_resource_tag(){
+  TAG=$(build_tag $2 $3 "true")
+  curl -s -XPOST "$INVENTORY_URL/inventory/resource/$1/addtags" \
+       -d $TAG \
+       -H "Content-Type: application/json" \
+  | jq .state "${@:4}"
+}
+
 
 ##############################
 # Counter
@@ -200,6 +254,28 @@ function generic_get(){
   esac
 }
 
+function generic_set(){
+  case $1 in
+    "resource-tag")
+    set_resource_tag "${@:2}"
+    ;;
+    *)
+    echo "resource-tag"
+    ;;
+  esac
+}
+
+function generic_del(){
+  case $1 in
+    "resource-tag")
+    del_resource_tag "${@:2}"
+    ;;
+    *)
+    echo "resource-tag"
+    ;;
+  esac
+}
+
 function generic_list(){
   case $1 in
     "tags")
@@ -211,6 +287,11 @@ function generic_list(){
     "resource-types")
     list_resource_types "${@:2}"
     ;;
+    *)
+    echo "tags"
+    echo "envs"
+    echo "resource-types"
+    ;;
   esac
 }
 
@@ -219,6 +300,9 @@ function generic_count(){
     "resources")
     count_resources "${@:2}"
     ;;
+    *)
+    echo "resources"
+    ;;
   esac
 }
 
@@ -226,11 +310,17 @@ case $1 in
   "get")
   generic_get "${@:2}"
   ;;
+  "set")
+  generic_set "${@:2}"
+  ;;
   "count")
   generic_count "${@:2}"
   ;;
   "list")
   generic_list "${@:2}"
+  ;;
+  "del")
+  generic_del "${@:2}"
   ;;
   "exec")
   iv_exec "${@:2}"
@@ -242,6 +332,13 @@ case $1 in
   usage "${@:2}"
   ;;
   *)
-  usage
+  echo "count"
+  echo "get"
+  echo "set"
+  echo "del"
+  echo "list"
+  echo "exec"
+  echo "alt-exec"
+  echo "help"
   ;;
 esac
