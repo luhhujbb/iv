@@ -2,17 +2,38 @@
 
 source iv.config
 
-if ! which jq;
+#################################
+# Deps check
+#################################
+jq_path=$(which jq)
+if [ -z "$jq_path" ];
+  then
+  echo "iv need jq"
+  exit 1
+fi
+curl_path=$(which curl)
+if [ -z "$jq_path" ];
   then
   echo "iv need jq"
   exit 1
 fi
 
-if ! which curl;
+#################################
+# Conf check
+#################################
+
+if [ -z "$INVENTORY_SCHEME" ];
   then
-  echo "iv need jq"
-  exit 1
+    INVENTORY_SCHEME="http"
 fi
+
+if [ -z "$INVENTORY_HOST_PORT" ];
+  then
+    INVENTORY_HOST_PORT="127.0.0.1"
+fi
+
+INVENTORY_URL="$INVENTORY_SCHEME://$INVENTORY_HOST_PORT"
+
 
 ##############################
 # USAGE
@@ -20,7 +41,34 @@ fi
 
 
 function usage(){
-  echo "iv cli helper !"
+  echo "Usage of iv cli :"
+  echo "* iv get"
+  echo " - iv get resource [RESOURCE_ID]"
+  echo " - iv get resources [ENV_TAG] [RESOURCE_TYPE_TAG] (--raw-output)"
+  echo " - iv get resource tag [RESOURCE_ID] [TAG] (--raw-output)"
+  echo " - iv get resources tag [RESOURCE_ID] [TAG] (--raw-output)"
+  echo "* iv list"
+  echo " - iv list envs"
+  echo " - iv list tags"
+  echo " - iv list resource-types"
+  echo "* iv count"
+  echo " - iv count resources [ENV_TAG] [RESOURCE_TYPE_TAG]"
+  echo "* iv exec"
+  echo " - iv exec [ENV_TAG] [RESOURCE_TYPE_TAG] you cmd goes here"
+}
+
+##############################
+# Build filter
+##############################
+
+
+function build_filter(){
+  if [ -z "$1" -a -z "$2" ];
+  then
+    echo -n "{}"
+  else
+    echo -n "{\"tags\":[{\"name\":\"$IV_RESOURCE_ENV_TAG\",\"value\":\"$1\"},{\"name\":\"$IV_RESOURCE_TYPE_TAG\",\"value\":\"$2\"}]}"
+  fi
 }
 
 ##############################
@@ -29,19 +77,41 @@ function usage(){
 
 
 function get_resource(){
-  curl "$INVENTORY_SCHEME://$INVENTORY_HOST_PORT/inventory/resource/$1" | jq .data
+  curl -s "$INVENTORY_URL/inventory/resource/$1" \
+  | jq .data "${@:2}"
 }
 
 function get_resource_tag(){
-
+  curl -s "$INVENTORY_URL/inventory/resource/$1" \
+  | jq .data.$2 "${@:3}"
 }
 
 function get_resources(){
-
+  FILTER=$(build_filter $1 $2)
+  curl -s -XPOST "$INVENTORY_URL/inventory/resource" \
+       -d $FILTER \
+       -H "Content-Type: application/json" \
+  | jq .data "${@:3}"
 }
 
 function get_resources_tag(){
+  FILTER=$(build_filter $1 $2)
+  curl -s -XPOST "$INVENTORY_URL/inventory/tag/resource/$3" \
+       -d $FILTER \
+       -H "Content-Type: application/json" \
+  | jq .data[] "${@:4}"
+}
 
+##############################
+# Counter
+##############################
+
+function count_resources(){
+  FILTER=$(build_filter $1 $2)
+  curl -s -XPOST "$INVENTORY_URL/inventory/count/resource" \
+       -d $FILTER \
+       -H "Content-Type: application/json" \
+  | jq .data.count "${@:3}"
 }
 
 ##############################
@@ -49,15 +119,18 @@ function get_resources_tag(){
 ##############################
 
 function list_envs(){
-
+  curl -s -XPOST "$INVENTORY_URL/inventory/tag/resource/$IV_RESOURCE_ENV_TAG" \
+  | jq .data[] "$@"
 }
 
 function list_tags(){
-
+  curl -s "$INVENTORY_URL/inventory/tag/resource" \
+  | jq .data[] "$@"
 }
 
 function list_resource_types(){
-
+  curl -s -XPOST "$INVENTORY_URL/inventory/tag/resource/$IV_RESOURCE_TYPE_TAG" \
+  | jq .data[] "$@"
 }
 
 ##############################
@@ -65,11 +138,41 @@ function list_resource_types(){
 ##############################
 
 function iv_exec(){
-
+  FILTER=$(build_filter $1 $2)
+  HOSTS=$(curl -s -XPOST "$INVENTORY_URL/inventory/resource/$IV_RESOURCE_HOST_TAG" \
+       -d $FILTER \
+       -H "Content-Type: application/json" \
+  | jq .data --raw-output)
+  for host in $HOSTS
+    do
+      echo "ssh $IV_USER@$host ${@:3}"
+      ssh $IV_USER@$host "${@:3}"
+      if [ "$?" == "0" ];
+        then
+          echo ">>>>>>>>>>>>>>>>>\e[32mSUCCESS\e[39m"
+      else
+        echo ">>>>>>>>>>>>>>>>>\e[31mERROR\e[39m"
+      fi
+    done
 }
 
 function iv_alt_exec(){
-
+  FILTER=$(build_filter $1 $2)
+  HOSTS=$(curl -s -XPOST "$INVENTORY_URL/inventory/resource/$IV_RESOURCE_HOST_TAG" \
+       -d $FILTER \
+       -H "Content-Type: application/json" \
+  | jq .data --raw-output)
+  for host in $HOSTS
+    do
+      echo "ssh $IV_ALT_USER@$host ${@:3}"
+      ssh $IV_ALT_USER@$host "${@:3}"
+      if [ "$?" == "0" ];
+        then
+          echo ">>>>>>>>>>>>>>>>>\e[32mSUCCESS\e[39m"
+      else
+        echo ">>>>>>>>>>>>>>>>>\e[31mERROR\e[39m"
+      fi
+    done
 }
 
 
@@ -87,19 +190,33 @@ function generic_get(){
     "resources-tag")
     get_resources_tag "${@:2}"
     ;;
+    *)
+    echo "resource"
+    echo "resources"
+    echo "resource-tag"
+    echo "resources-tag"
+    ;;
   esac
 }
 
 function generic_list(){
   case $1 in
     "tags")
-    list_tags
+    list_tags "${@:2}"
     ;;
     "envs")
-    list_envs
+    list_envs "${@:2}"
     ;;
     "resource-types")
-    list_resource_types
+    list_resource_types "${@:2}"
+    ;;
+  esac
+}
+
+function generic_count(){
+  case $1 in
+    "resources")
+    count_resources "${@:2}"
     ;;
   esac
 }
@@ -108,6 +225,9 @@ case $1 in
   "get")
   generic_get "${@:2}"
   ;;
+  "count")
+  generic_count "${@:2}"
+  ;;
   "list")
   generic_list "${@:2}"
   ;;
@@ -115,6 +235,9 @@ case $1 in
   get_resources "${@:2}"
   ;;
   "alt-exec")
+  get_resources "${@:2}"
+  ;;
+  "help")
   get_resources "${@:2}"
   ;;
   *)

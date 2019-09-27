@@ -1,3 +1,4 @@
+#!/bin/bash
 export INVENTORY_HOST_PORT="inventory.example.com:80"
 export INVENTORY_SCHEME="http"
 export IV_USER="inventory"
