@@ -55,6 +55,7 @@ function usage(){
   echo " - iv count resources [ENV_TAG] [RESOURCE_TYPE_TAG]"
   echo "* iv exec"
   echo " - iv exec [ENV_TAG] [RESOURCE_TYPE_TAG] you cmd goes here"
+  echo " - iv alt-exec [ENV_TAG] [RESOURCE_TYPE_TAG] you cmd goes here"
 }
 
 ##############################
@@ -139,38 +140,38 @@ function list_resource_types(){
 
 function iv_exec(){
   FILTER=$(build_filter $1 $2)
-  HOSTS=$(curl -s -XPOST "$INVENTORY_URL/inventory/resource/$IV_RESOURCE_HOST_TAG" \
+  HOSTS=$(curl -s -XPOST "$INVENTORY_URL/inventory/tag/resource/$IV_RESOURCE_HOST_TAG" \
        -d $FILTER \
        -H "Content-Type: application/json" \
-  | jq .data --raw-output)
+  | jq .data[] --raw-output)
   for host in $HOSTS
     do
-      echo "ssh $IV_USER@$host ${@:3}"
+      echo "Executing ssh $IV_USER@$host ${@:3}"
       ssh $IV_USER@$host "${@:3}"
       if [ "$?" == "0" ];
         then
-          echo ">>>>>>>>>>>>>>>>>\e[32mSUCCESS\e[39m"
+          echo -e ">>>>>>>>>>>>>>>>> \e[32mSUCCESS\e[39m"
       else
-        echo ">>>>>>>>>>>>>>>>>\e[31mERROR\e[39m"
+        echo -e ">>>>>>>>>>>>>>>>> \e[31mERROR\e[39m"
       fi
     done
 }
 
 function iv_alt_exec(){
   FILTER=$(build_filter $1 $2)
-  HOSTS=$(curl -s -XPOST "$INVENTORY_URL/inventory/resource/$IV_RESOURCE_HOST_TAG" \
+  HOSTS=$(curl -s -XPOST "$INVENTORY_URL/inventory/tag/resource/$IV_RESOURCE_HOST_TAG" \
        -d $FILTER \
        -H "Content-Type: application/json" \
-  | jq .data --raw-output)
+  | jq .data[] --raw-output)
   for host in $HOSTS
     do
-      echo "ssh $IV_ALT_USER@$host ${@:3}"
+      echo "Executing ssh $IV_ALT_USER@$host ${@:3}"
       ssh $IV_ALT_USER@$host "${@:3}"
       if [ "$?" == "0" ];
         then
-          echo ">>>>>>>>>>>>>>>>>\e[32mSUCCESS\e[39m"
+          echo -e ">>>>>>>>>>>>>>>>> \e[32mSUCCESS\e[39m"
       else
-        echo ">>>>>>>>>>>>>>>>>\e[31mERROR\e[39m"
+        echo -e ">>>>>>>>>>>>>>>>> \e[31mERROR\e[39m"
       fi
     done
 }
@@ -232,13 +233,13 @@ case $1 in
   generic_list "${@:2}"
   ;;
   "exec")
-  get_resources "${@:2}"
+  iv_exec "${@:2}"
   ;;
   "alt-exec")
-  get_resources "${@:2}"
+  iv_alt_exec "${@:2}"
   ;;
   "help")
-  get_resources "${@:2}"
+  usage "${@:2}"
   ;;
   *)
   usage
