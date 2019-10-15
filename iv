@@ -20,6 +20,13 @@ if [ -z "$jq_path" ];
   exit 1
 fi
 
+curl_path=$(which ansible)
+if [ -z "$jq_path" -a "$IV_PLAYBOOK" == "true" ];
+  then
+  echo "iv need ansible"
+  exit 1
+fi
+
 #################################
 # Conf check
 #################################
@@ -60,6 +67,11 @@ function usage(){
   echo "* iv exec"
   echo " - iv exec [ENV_TAG] [RESOURCE_TYPE_TAG] you cmd goes here"
   echo " - iv alt-exec [ENV_TAG] [RESOURCE_TYPE_TAG] you cmd goes here"
+  if [ "$IV_PLAYBOOK" == "true" ];
+    then
+    echo "* iv playbook"
+    echo " - iv playbook [ENV_TAG] [RESOURCE_TYPE_TAG] your ansible playbook"
+  fi
 }
 
 ##############################
@@ -230,6 +242,16 @@ function iv_alt_exec(){
     done
 }
 
+function iv_playbook(){
+  FILTER=$(build_filter $1 $2)
+  HOSTS=$(curl -s -XPOST "$INVENTORY_URL/inventory/tag/resource/$IV_RESOURCE_HOST_TAG" \
+       -d $FILTER \
+       -H "Content-Type: application/json" \
+  | jq .data[] --raw-output | paste -sd',')
+  HOSTS=$HOSTS","
+  ansible-playbook -i "$HOSTS" --user "$IV_USER" "${@:3}"
+}
+
 
 function generic_get(){
   case $1 in
@@ -328,6 +350,9 @@ case $1 in
   "alt-exec")
   iv_alt_exec "${@:2}"
   ;;
+  "playbook")
+  iv_playbook "${@:2}"
+  ;;
   "help")
   usage "${@:2}"
   ;;
@@ -339,6 +364,10 @@ case $1 in
   echo "list"
   echo "exec"
   echo "alt-exec"
+  if [ "$IV_PLAYBOOK" == "true" ];
+  then
+    echo "playbook"
+  fi
   echo "help"
   ;;
 esac
