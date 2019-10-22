@@ -83,7 +83,9 @@ function build_filter(){
   then
     echo -n "{}"
   else
-    echo -n "{\"tags\":[{\"name\":\"$IV_RESOURCE_ENV_TAG\",\"value\":\"$1\"},{\"name\":\"$IV_RESOURCE_TYPE_TAG\",\"value\":\"$2\"}]}"
+    TAGS=$(echo $2 | sed -e 's/,/","/g')
+    TAG_ARRAY="[\"$TAGS\"]"
+    echo -n "{\"tags\":[{\"name\":\"$IV_RESOURCE_ENV_TAG\",\"value\":\"$1\"},{\"name\":\"$IV_RESOURCE_TYPE_TAG\",\"value\":$TAG_ARRAY}]}"
   fi
 }
 
