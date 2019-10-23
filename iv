@@ -51,9 +51,9 @@ function usage(){
   echo "Usage of iv cli :"
   echo "* iv get"
   echo " - iv get resource [RESOURCE_ID]"
-  echo " - iv get resources [ENV_TAG] [RESOURCE_TYPE_TAG] (--raw-output)"
-  echo " - iv get resource-tag [RESOURCE_ID] [TAG] (--raw-output)"
-  echo " - iv get resources-tag [RESOURCE_ID] [TAG] (--raw-output)"
+  echo " - iv get resources [ENV_TAG] [RESOURCE_TYPE_TAG] (--region REGION) (--raw-output)"
+  echo " - iv get resource-tag [RESOURCE_ID] [TAG] (--region REGION) (--raw-output)"
+  echo " - iv get resources-tag [RESOURCE_ID] [TAG] (--region REGION) (--raw-output)"
   echo "* iv set"
   echo " - iv set resource-tag [RESOURCE_ID] [TAG] [VALUE]"
   echo "* iv del"
@@ -63,14 +63,14 @@ function usage(){
   echo " - iv list tags"
   echo " - iv list resource-types"
   echo "* iv count"
-  echo " - iv count resources [ENV_TAG] [RESOURCE_TYPE_TAG]"
+  echo " - iv count resources [ENV_TAG] [RESOURCE_TYPE_TAG] (--region REGION)"
   echo "* iv exec"
-  echo " - iv exec [ENV_TAG] [RESOURCE_TYPE_TAG] you cmd goes here"
-  echo " - iv alt-exec [ENV_TAG] [RESOURCE_TYPE_TAG] you cmd goes here"
+  echo " - iv exec [ENV_TAG] [RESOURCE_TYPE_TAG] (--region REGION) you cmd goes here"
+  echo " - iv alt-exec [ENV_TAG] [RESOURCE_TYPE_TAG] (--region REGION) you cmd goes here"
   if [ "$IV_PLAYBOOK" == "true" ];
     then
     echo "* iv playbook"
-    echo " - iv playbook [ENV_TAG] [RESOURCE_TYPE_TAG] your ansible playbook"
+    echo " - iv playbook [ENV_TAG] [RESOURCE_TYPE_TAG] (--region REGION) your ansible playbook"
   fi
 }
 
@@ -83,9 +83,17 @@ function build_filter(){
   then
     echo -n "{}"
   else
+    if [ -z "$3" ];
+      then
+        REGION_FILTER=""
+      else
+        REGION_FILTER=",{\"name\":\"REGION\",\"value\":\"$3\"}"
+    fi
     TAGS=$(echo $2 | sed -e 's/,/","/g')
     TAG_ARRAY="[\"$TAGS\"]"
-    echo -n "{\"tags\":[{\"name\":\"$IV_RESOURCE_ENV_TAG\",\"value\":\"$1\"},{\"name\":\"$IV_RESOURCE_TYPE_TAG\",\"value\":$TAG_ARRAY}]}"
+    ENVS=$(echo $1| sed -e 's/,/","/g')
+    ENVS_ARRAY="[\"$ENVS\"]"
+    echo -n "{\"tags\":[{\"name\":\"$IV_RESOURCE_ENV_TAG\",\"value\":$ENVS_ARRAY},{\"name\":\"$IV_RESOURCE_TYPE_TAG\",\"value\":$TAG_ARRAY}$REGION_FILTER]}"
   fi
 }
 
@@ -131,19 +139,33 @@ function get_resource_tag(){
 }
 
 function get_resources(){
-  FILTER=$(build_filter $1 $2)
+  if [ ! -z "$3" -a "$3" == "--region" ]
+    then
+      FILTER=$(build_filter $1 $2 $4)
+      JQ_ARGS=("${@:5}")
+    else
+      FILTER=$(build_filter $1 $2)
+      JQ_ARGS=("${@:3}")
+  fi
   curl -s -XPOST "$INVENTORY_URL/inventory/resource" \
        -d $FILTER \
        -H "Content-Type: application/json" \
-  | jq .data "${@:3}"
+  | jq .data "${JQ_ARGS[@]}"
 }
 
 function get_resources_tag(){
-  FILTER=$(build_filter $1 $2)
+  if [ ! -z "$4" -a "$4" == "--region" ]
+    then
+      FILTER=$(build_filter $1 $2 $5)
+      JQ_ARGS=("${@:6}")
+    else
+      FILTER=$(build_filter $1 $2)
+      JQ_ARGS=("${@:4}")
+  fi
   curl -s -XPOST "$INVENTORY_URL/inventory/tag/resource/$3" \
        -d $FILTER \
        -H "Content-Type: application/json" \
-  | jq .data[] "${@:4}"
+  | jq .data[] "${JQ_ARGS[@]}"
 }
 
 ##############################
@@ -176,11 +198,18 @@ function del_resource_tag(){
 ##############################
 
 function count_resources(){
-  FILTER=$(build_filter $1 $2)
+  if [ ! -z "$3" -a "$3" == "--region" ]
+    then
+      FILTER=$(build_filter $1 $2 $4)
+      JQ_ARGS=("${@:5}")
+    else
+      FILTER=$(build_filter $1 $2)
+      JQ_ARGS=("${@:3}")
+  fi
   curl -s -XPOST "$INVENTORY_URL/inventory/count/resource" \
        -d $FILTER \
        -H "Content-Type: application/json" \
-  | jq .data.count "${@:3}"
+  | jq .data.count "${JQ_ARGS[@]}"
 }
 
 ##############################
@@ -207,15 +236,22 @@ function list_resource_types(){
 ##############################
 
 function iv_exec(){
-  FILTER=$(build_filter $1 $2)
+  if [ ! -z "$3" -a "$3" == "--region" ]
+    then
+      FILTER=$(build_filter $1 $2 $4)
+      SSH_ARGS=("${@:5}")
+    else
+      FILTER=$(build_filter $1 $2)
+      SSH_ARGS=("${@:3}")
+  fi
   HOSTS=$(curl -s -XPOST "$INVENTORY_URL/inventory/tag/resource/$IV_RESOURCE_HOST_TAG" \
        -d $FILTER \
        -H "Content-Type: application/json" \
   | jq .data[] --raw-output)
   for host in $HOSTS
     do
-      echo "Executing ssh $IV_USER@$host ${@:3}"
-      ssh $IV_USER@$host "${@:3}"
+      echo "Executing ssh $IV_USER@$host ${SSH_ARGS[@]}"
+      ssh $IV_USER@$host "${SSH_ARGS[@]}"
       if [ "$?" == "0" ];
         then
           echo -e ">>>>>>>>>>>>>>>>> \e[32mSUCCESS\e[39m"
@@ -226,15 +262,22 @@ function iv_exec(){
 }
 
 function iv_alt_exec(){
-  FILTER=$(build_filter $1 $2)
+  if [ ! -z "$3" -a "$3" == "--region" ]
+    then
+      FILTER=$(build_filter $1 $2 $4)
+      SSH_ARGS=("${@:5}")
+    else
+      FILTER=$(build_filter $1 $2)
+      SSH_ARGS=("${@:3}")
+  fi
   HOSTS=$(curl -s -XPOST "$INVENTORY_URL/inventory/tag/resource/$IV_RESOURCE_HOST_TAG" \
        -d $FILTER \
        -H "Content-Type: application/json" \
   | jq .data[] --raw-output)
   for host in $HOSTS
     do
-      echo "Executing ssh $IV_ALT_USER@$host ${@:3}"
-      ssh $IV_ALT_USER@$host "${@:3}"
+      echo "Executing ssh $IV_ALT_USER@$host ${SSH_ARGS[@]}"
+      ssh $IV_ALT_USER@$host "${SSH_ARGS[@]}"
       if [ "$?" == "0" ];
         then
           echo -e ">>>>>>>>>>>>>>>>> \e[32mSUCCESS\e[39m"
@@ -245,13 +288,20 @@ function iv_alt_exec(){
 }
 
 function iv_playbook(){
-  FILTER=$(build_filter $1 $2)
+  if [ ! -z "$3" -a "$3" == "--region" ]
+    then
+      FILTER=$(build_filter $1 $2 $4)
+      PLAYBOOK_ARGS=("${@:5}")
+    else
+      FILTER=$(build_filter $1 $2)
+      PLAYBOOK_ARGS=("${@:3}")
+  fi
   HOSTS=$(curl -s -XPOST "$INVENTORY_URL/inventory/tag/resource/$IV_RESOURCE_HOST_TAG" \
        -d $FILTER \
        -H "Content-Type: application/json" \
   | jq .data[] --raw-output | paste -sd',')
   HOSTS=$HOSTS","
-  ansible-playbook -i "$HOSTS" --user "$IV_USER" "${@:3}"
+  ansible-playbook -i "$HOSTS" --user "$IV_USER" "${PLAYBOOK_ARGS[@]}"
 }
 
 
