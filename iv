@@ -79,21 +79,28 @@ function usage(){
 ##############################
 
 function build_filter(){
-  if [ -z "$1" -a -z "$2" ];
+  if [ -z "$1" ]
   then
-    echo -n "{}"
+    echo "{}"
   else
+    ENVS=$(echo $1| sed -e 's/,/","/g')
+    ENVS_ARRAY="[\"$ENVS\"]"
+    ENV_FILTER="{\"name\":\"$IV_RESOURCE_ENV_TAG\",\"value\":$ENVS_ARRAY}"
+    if [  -z "$2" ];
+      then
+        TAG_FILTER=""
+      else
+        TAGS=$(echo $2 | sed -e 's/,/","/g')
+        TAG_ARRAY="[\"$TAGS\"]"
+        TAG_FILTER=",{\"name\":\"$IV_RESOURCE_TYPE_TAG\",\"value\":$TAG_ARRAY}"
+    fi
     if [ -z "$3" ];
       then
         REGION_FILTER=""
       else
         REGION_FILTER=",{\"name\":\"REGION\",\"value\":\"$3\"}"
     fi
-    TAGS=$(echo $2 | sed -e 's/,/","/g')
-    TAG_ARRAY="[\"$TAGS\"]"
-    ENVS=$(echo $1| sed -e 's/,/","/g')
-    ENVS_ARRAY="[\"$ENVS\"]"
-    echo -n "{\"tags\":[{\"name\":\"$IV_RESOURCE_ENV_TAG\",\"value\":$ENVS_ARRAY},{\"name\":\"$IV_RESOURCE_TYPE_TAG\",\"value\":$TAG_ARRAY}$REGION_FILTER]}"
+    echo -n "{\"tags\":[$ENV_FILTER$TAG_FILTER$REGION_FILTER]}"
   fi
 }
 
