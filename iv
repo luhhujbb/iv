@@ -180,11 +180,16 @@ function get_resources_tag(){
 ##############################
 
 function set_resource_tag(){
-  TAG=$(build_tag $2 $3 "false")
-  curl -s -XPOST "$INVENTORY_URL/inventory/resource/$1/addtags" \
-       -d $TAG \
-       -H "Content-Type: application/json" \
-  | jq .state "${@:4}"
+  if [ ! -z "$1" -a ! -z "$2" -a ! -z "$3" ];
+    then
+      TAG=$(build_tag $2 $3 "false")
+      curl -s -XPOST "$INVENTORY_URL/inventory/resource/$1/addtags" \
+           -d $TAG \
+          -H "Content-Type: application/json" \
+      | jq .state "${@:4}"
+    else
+        echo "iv set resource-tag [RESOURCE_ID] [TAG_NAME] [TAG_VALUE]: missing args"
+  fi
 }
 
 ##############################
@@ -192,11 +197,16 @@ function set_resource_tag(){
 ##############################
 
 function del_resource_tag(){
+  if [ ! -z "$1" -a ! -z "$2" -a ! -z "$3" ];
+    then
   TAG=$(build_tag $2 $3 "true")
   curl -s -XPOST "$INVENTORY_URL/inventory/resource/$1/addtags" \
        -d $TAG \
        -H "Content-Type: application/json" \
   | jq .state "${@:4}"
+   else
+     echo "iv del resource-tag [RESOURCE_ID] [TAG_NAME] [TAG_VALUE]: missing args"
+  fi
 }
 
 
