@@ -304,6 +304,66 @@ function iv_alt_exec(){
     done
 }
 
+###############################################
+# Copy
+###############################################
+
+function iv_cptr(){
+  if [ ! -z "$3" -a "$3" == "--region" ]
+    then
+      FILTER=$(build_filter $1 $2 $4)
+      SSH_ARGS=("${@:5}")
+    else
+      FILTER=$(build_filter $1 $2)
+      SSH_ARGS=("${@:3}")
+  fi
+  HOSTS=$(curl -s -XPOST "$INVENTORY_URL/inventory/tag/resource/$IV_RESOURCE_HOST_TAG" \
+       -d $FILTER \
+       -H "Content-Type: application/json" \
+  | jq .data[] --raw-output)
+  for host in $HOSTS
+    do
+      echo "Executing scp ${SSH_ARGS[0]} $IV_USER@$host:${SSH_ARGS[1]}"
+      scp ${SSH_ARGS[0]} $IV_USER@$host:${SSH_ARGS[1]}
+      if [ "$?" == "0" ];
+        then
+          echo -e ">>>>>>>>>>>>>>>>> \e[32mSUCCESS\e[39m"
+      else
+        echo -e ">>>>>>>>>>>>>>>>> \e[31mERROR\e[39m"
+      fi
+    done
+}
+
+function iv_cpfr(){
+  if [ ! -z "$3" -a "$3" == "--region" ]
+    then
+      FILTER=$(build_filter $1 $2 $4)
+      SSH_ARGS=("${@:5}")
+    else
+      FILTER=$(build_filter $1 $2)
+      SSH_ARGS=("${@:3}")
+  fi
+  HOSTS=$(curl -s -XPOST "$INVENTORY_URL/inventory/tag/resource/$IV_RESOURCE_HOST_TAG" \
+       -d $FILTER \
+       -H "Content-Type: application/json" \
+  | jq .data[] --raw-output)
+  for host in $HOSTS
+    do
+      echo "Executing scp $IV_USER@$host:${SSH_ARGS[0]} ${SSH_ARGS[1]}"
+      scp $IV_USER@$host:${SSH_ARGS[0]} ${SSH_ARGS[1]}
+      if [ "$?" == "0" ];
+        then
+          echo -e ">>>>>>>>>>>>>>>>> \e[32mSUCCESS\e[39m"
+      else
+        echo -e ">>>>>>>>>>>>>>>>> \e[31mERROR\e[39m"
+      fi
+    done
+}
+
+###############################################
+#  Playbook
+###############################################
+
 function iv_playbook(){
   if [ ! -z "$3" -a "$3" == "--region" ]
     then
@@ -416,6 +476,12 @@ case $1 in
   "exec")
   iv_exec "${@:2}"
   ;;
+  "cp-to-remote")
+  iv_cptr "${@:2}"
+  ;;
+  "cp-from-remote")
+  iv_cpfr "${@:2}"
+  ;;
   "alt-exec")
   iv_alt_exec "${@:2}"
   ;;
@@ -432,6 +498,8 @@ case $1 in
   echo "del"
   echo "list"
   echo "exec"
+  echo "cp-to-remote"
+  echo "cp-from-remote"
   echo "alt-exec"
   if [ "$IV_PLAYBOOK" == "true" ];
   then
