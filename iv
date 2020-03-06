@@ -381,6 +381,26 @@ function iv_playbook(){
   ansible-playbook -i "$HOSTS" --user "$IV_USER" "${PLAYBOOK_ARGS[@]}"
 }
 
+###############################################
+#  Ansible
+###############################################
+
+function iv_ansible(){
+  if [ ! -z "$3" -a "$3" == "--region" ]
+    then
+      FILTER=$(build_filter $1 $2 $4)
+      PLAYBOOK_ARGS=("${@:5}")
+    else
+      FILTER=$(build_filter $1 $2)
+      PLAYBOOK_ARGS=("${@:3}")
+  fi
+  HOSTS=$(curl -s -XPOST "$INVENTORY_URL/inventory/tag/resource/$IV_RESOURCE_HOST_TAG" \
+       -d $FILTER \
+       -H "Content-Type: application/json" \
+  | jq .data[] --raw-output | paste -sd',')
+  HOSTS=$HOSTS","
+  ansible -i "$HOSTS" all --user "$IV_USER" "${PLAYBOOK_ARGS[@]}"
+}
 
 function generic_get(){
   case $1 in
@@ -487,6 +507,9 @@ case $1 in
   ;;
   "playbook")
   iv_playbook "${@:2}"
+  ;;
+  "ansible")
+  iv_ansible "${@:2}"
   ;;
   "help")
   usage "${@:2}"
