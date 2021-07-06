@@ -248,6 +248,16 @@ function list_resource_types(){
   | jq .data[] "$@"
 }
 
+function list_regions(){
+  curl -s -XPOST "$INVENTORY_URL/inventory/tag/resource/REGION" \
+  | jq .data[] "$@"
+}
+
+function list_azs(){
+  curl -s -XPOST "$INVENTORY_URL/inventory/tag/resource/AZ" \
+  | jq .data[] "$@"
+}
+
 ##############################
 # EXEC
 ##############################
@@ -276,6 +286,29 @@ function iv_exec(){
         echo -e ">>>>>>>>>>>>>>>>> \e[31mERROR\e[39m"
       fi
     done
+}
+
+function iv_exec_one(){
+  if [ ! -z "$3" -a "$3" == "--region" ]
+    then
+      FILTER=$(build_filter $1 $2 $4)
+      SSH_ARGS=("${@:5}")
+    else
+      FILTER=$(build_filter $1 $2)
+      SSH_ARGS=("${@:3}")
+  fi
+  HOST=$(curl -s -XPOST "$INVENTORY_URL/inventory/tag/resource/$IV_RESOURCE_HOST_TAG" \
+       -d $FILTER \
+       -H "Content-Type: application/json" \
+  | jq .data[0] --raw-output)
+  echo "Executing ssh $IV_USER@$HOST ${SSH_ARGS[@]}"
+  ssh $IV_USER@$HOST "${SSH_ARGS[@]}"
+  if [ "$?" == "0" ];
+    then
+      echo -e ">>>>>>>>>>>>>>>>> \e[32mSUCCESS\e[39m"
+  else
+        echo -e ">>>>>>>>>>>>>>>>> \e[31mERROR\e[39m"
+  fi
 }
 
 function iv_alt_exec(){
@@ -455,12 +488,20 @@ function generic_list(){
     "envs")
     list_envs "${@:2}"
     ;;
+    "regions")
+    list_regions "${@:2}"
+    ;;
     "resource-types")
     list_resource_types "${@:2}"
+    ;;
+    "azs")
+    list_azs "${@:2}"
     ;;
     *)
     echo "tags"
     echo "envs"
+    echo "regions"
+    echo "azs"
     echo "resource-types"
     ;;
   esac
@@ -496,6 +537,9 @@ case $1 in
   "exec")
   iv_exec "${@:2}"
   ;;
+  "exec-one")
+  iv_exec_one "${@:2}"
+  ;;
   "cp-to-remote")
   iv_cptr "${@:2}"
   ;;
@@ -521,6 +565,7 @@ case $1 in
   echo "del"
   echo "list"
   echo "exec"
+  echo "exec-one"
   echo "cp-to-remote"
   echo "cp-from-remote"
   echo "alt-exec"
