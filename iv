@@ -288,6 +288,7 @@ function iv_exec(){
     done
 }
 
+#one variation
 function iv_exec_one(){
   if [ ! -z "$3" -a "$3" == "--region" ]
     then
@@ -337,6 +338,31 @@ function iv_alt_exec(){
     done
 }
 
+function iv_alt_exec_one(){
+  if [ ! -z "$3" -a "$3" == "--region" ]
+    then
+      FILTER=$(build_filter $1 $2 $4)
+      SSH_ARGS=("${@:5}")
+    else
+      FILTER=$(build_filter $1 $2)
+      SSH_ARGS=("${@:3}")
+  fi
+  HOST=$(curl -s -XPOST "$INVENTORY_URL/inventory/tag/resource/$IV_RESOURCE_HOST_TAG" \
+       -d $FILTER \
+       -H "Content-Type: application/json" \
+  | jq .data[0] --raw-output)
+  echo "Executing ssh $IV_ALT_USER@$host ${SSH_ARGS[@]}"
+  ssh $IV_ALT_USER@$HOST "${SSH_ARGS[@]}"
+  if [ "$?" == "0" ];
+    then
+      echo -e ">>>>>>>>>>>>>>>>> \e[32mSUCCESS\e[39m"
+  else
+    echo -e ">>>>>>>>>>>>>>>>> \e[31mERROR\e[39m"
+  fi
+}
+
+
+
 ###############################################
 # Copy
 ###############################################
@@ -367,6 +393,30 @@ function iv_cptr(){
     done
 }
 
+# one variation
+function iv_cptr_one(){
+  if [ ! -z "$3" -a "$3" == "--region" ]
+    then
+      FILTER=$(build_filter $1 $2 $4)
+      SSH_ARGS=("${@:5}")
+    else
+      FILTER=$(build_filter $1 $2)
+      SSH_ARGS=("${@:3}")
+  fi
+  HOST=$(curl -s -XPOST "$INVENTORY_URL/inventory/tag/resource/$IV_RESOURCE_HOST_TAG" \
+       -d $FILTER \
+       -H "Content-Type: application/json" \
+  | jq .data[0] --raw-output)
+  echo "Executing scp ${SSH_ARGS[0]} $IV_USER@$HOST:${SSH_ARGS[1]}"
+  scp ${SSH_ARGS[0]} $IV_USER@$HOST:${SSH_ARGS[1]}
+  if [ "$?" == "0" ];
+    then
+      echo -e ">>>>>>>>>>>>>>>>> \e[32mSUCCESS\e[39m"
+  else
+    echo -e ">>>>>>>>>>>>>>>>> \e[31mERROR\e[39m"
+  fi
+}
+
 function iv_cpfr(){
   if [ ! -z "$3" -a "$3" == "--region" ]
     then
@@ -391,6 +441,30 @@ function iv_cpfr(){
         echo -e ">>>>>>>>>>>>>>>>> \e[31mERROR\e[39m"
       fi
     done
+}
+
+# one variation
+function iv_cpfr_one(){
+  if [ ! -z "$3" -a "$3" == "--region" ]
+    then
+      FILTER=$(build_filter $1 $2 $4)
+      SSH_ARGS=("${@:5}")
+    else
+      FILTER=$(build_filter $1 $2)
+      SSH_ARGS=("${@:3}")
+  fi
+  HOST=$(curl -s -XPOST "$INVENTORY_URL/inventory/tag/resource/$IV_RESOURCE_HOST_TAG" \
+       -d $FILTER \
+       -H "Content-Type: application/json" \
+  | jq .data[0] --raw-output)
+  echo "Executing scp $IV_USER@$HOST:${SSH_ARGS[0]} ${SSH_ARGS[1]}"
+  scp $IV_USER@$HOST:${SSH_ARGS[0]} ${SSH_ARGS[1]}
+  if [ "$?" == "0" ];
+    then
+      echo -e ">>>>>>>>>>>>>>>>> \e[32mSUCCESS\e[39m"
+  else
+    echo -e ">>>>>>>>>>>>>>>>> \e[31mERROR\e[39m"
+  fi
 }
 
 ###############################################
@@ -543,8 +617,14 @@ case $1 in
   "cp-to-remote")
   iv_cptr "${@:2}"
   ;;
+  "cp-to-remote-one")
+  iv_cptr_one "${@:2}"
+  ;;
   "cp-from-remote")
   iv_cpfr "${@:2}"
+  ;;
+  "cp-from-remote-one")
+  iv_cpfr_one "${@:2}"
   ;;
   "alt-exec")
   iv_alt_exec "${@:2}"
@@ -567,7 +647,9 @@ case $1 in
   echo "exec"
   echo "exec-one"
   echo "cp-to-remote"
+  echo "cp-to-remote-one"
   echo "cp-from-remote"
+  echo "cp-from-remote-one"
   echo "alt-exec"
   if [ "$IV_PLAYBOOK" == "true" ];
   then
