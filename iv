@@ -655,6 +655,10 @@ case $1 in
   then
     echo "playbook"
   fi
+  if [ "$IV_PLAYBOOK" == "true" ];
+  then
+    echo "ansible"
+  fi
   echo "help"
   ;;
 esac
