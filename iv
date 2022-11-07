@@ -61,6 +61,7 @@ function usage(){
   echo "* iv list"
   echo " - iv list envs"
   echo " - iv list tags"
+  echo " - iv list tag-values [TAG]"
   echo " - iv list resource-types"
   echo "* iv count"
   echo " - iv count resources [ENV_TAG] [RESOURCE_TYPE_TAG] (--region REGION)"
@@ -241,6 +242,11 @@ function list_envs(){
 function list_tags(){
   curl -s "$INVENTORY_URL/inventory/tag/resource" \
   | jq .data[] "$@"
+}
+
+function list_tag_values(){
+  curl -s -XPOST "$INVENTORY_URL/inventory/tag/resource/$1" \
+  | jq .data[] "${@:2}"
 }
 
 function list_resource_types(){
@@ -559,6 +565,9 @@ function generic_list(){
     "tags")
     list_tags "${@:2}"
     ;;
+    "tag-values")
+    list_tag_values "${@:2}"
+    ;;
     "envs")
     list_envs "${@:2}"
     ;;
@@ -573,6 +582,7 @@ function generic_list(){
     ;;
     *)
     echo "tags"
+    echo "tag-values [TAG]"
     echo "envs"
     echo "regions"
     echo "azs"
